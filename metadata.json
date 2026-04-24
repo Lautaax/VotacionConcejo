@@ -1,0 +1,6 @@
+{
+  "name": "Transparencia Legislativa",
+  "description": "Sistema de votación en tiempo real para el Concejo Deliberante con seguimiento público, historial de ordenanzas y panel administrativo.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

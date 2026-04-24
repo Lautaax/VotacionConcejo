@@ -1,0 +1,59 @@
+{
+  "entities": {
+    "expediente": {
+      "title": "Expediente",
+      "description": "Un documento legislativo que será sometido a votación.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Título del expediente" },
+        "description": { "type": "string", "description": "Descripción corta" },
+        "status": { "type": "string", "enum": ["pendiente", "aprobado", "rechazado"], "description": "Estado del voto" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "status", "createdAt"]
+    },
+    "voto": {
+      "title": "Voto",
+      "description": "Voto emitido por un concejal para un expediente específico.",
+      "type": "object",
+      "properties": {
+        "expedienteId": { "type": "string" },
+        "concejalId": { "type": "string" },
+        "concejalName": { "type": "string" },
+        "voto": { "type": "string", "enum": ["si", "no", "abstencion"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["expedienteId", "concejalId", "voto", "createdAt"]
+    },
+    "concejal": {
+      "title": "Perfil de Concejal",
+      "description": "Información pública de un miembro del concejo.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["concejal", "admin"] },
+        "checkedIn": { "type": "boolean" }
+      },
+      "required": ["name", "email", "role"]
+    },
+    "configuracion": {
+      "title": "Configuración de Sesión",
+      "description": "Estado global de la sesión legislativa.",
+      "type": "object",
+      "properties": {
+        "currentExpedienteId": { "type": "string" },
+        "timerEnd": { "type": "integer", "description": "Timestamp de fin de votación" },
+        "nextSessionDate": { "type": "string", "format": "date-time" },
+        "isSessionActive": { "type": "boolean" },
+        "isVotingOpen": { "type": "boolean" }
+      }
+    }
+  },
+  "firestore": {
+    "/expedientes/{id}": { "schema": "expediente", "description": "Documentos legislativos" },
+    "/votos/{id}": { "schema": "voto", "description": "Historial de votos individuales" },
+    "/concejales/{id}": { "schema": "concejal", "description": "Perfiles y roles" },
+    "/configuracion/sesion": { "schema": "configuracion", "description": "Estado de la sesión actual" }
+  }
+}

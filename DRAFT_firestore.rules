@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isEmailVerified() {
+      return request.auth.token.email_verified == true;
+    }
+
+    function isConcejal() {
+      let profile = get(/databases/$(database)/documents/concejales/$(request.auth.uid)).data;
+      return isSignedIn() && profile.role in ['concejal', 'admin'];
+    }
+
+    function isAdmin() {
+      let profile = get(/databases/$(database)/documents/concejales/$(request.auth.uid)).data;
+      return isSignedIn() && profile.role == 'admin';
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Expedientes validation
+    function isValidExpediente(data) {
+      return data.keys().hasAll(['title', 'status', 'createdAt']) &&
+             data.keys().size() >= 3 &&
+             data.title is string && data.title.size() <= 200 &&
+             data.status in ['pendiente', 'aprobado', 'rechazado'] &&
+             data.createdAt == request.time;
+    }
+
+    match /expedientes/{expedienteId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidExpediente(request.resource.data);
+      allow update: if isAdmin() && isValidExpediente(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // Votos validation
+    function isValidVoto(data) {
+      return data.keys().hasAll(['expedienteId', 'concejalId', 'voto', 'createdAt']) &&
+             data.keys().size() >= 4 &&
+             isValidId(data.expedienteId) &&
+             data.concejalId == request.auth.uid &&
+             data.voto in ['si', 'no', 'abstencion'] &&
+             data.createdAt == request.time;
+    }
+
+    match /votos/{votoId} {
+      allow read: if true;
+      allow create: if isConcejal() && 
+                    isValidVoto(request.resource.data) &&
+                    !exists(/databases/$(database)/documents/votos/$(request.auth.uid + '_' + request.resource.data.expedienteId));
+      // Manual delete or update not allowed for individual votes
+    }
+
+    // Concejales profile
+    match /concejales/{concejalId} {
+      allow read: if true;
+      allow create: if isSignedIn() && (request.auth.uid == concejalId);
+      allow update: if isAdmin() || (request.auth.uid == concejalId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['checkedIn', 'name']));
+    }
+
+    // Configuración
+    match /configuracion/sesion {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}
