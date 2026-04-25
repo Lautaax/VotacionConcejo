@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, onSnapshot, getDoc, setDoc, getDocFromServer, serverTimestamp } from 'firebase/firestore';
 import { auth, db, signIn, signOut } from './lib/firebase';
@@ -26,6 +26,27 @@ export default function App() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'connecting' | 'disconnected'>('connecting');
   const { session, currentExpediente, votes, concejales, autorizados, isLoading: dataLoading } = useVotacionRealtime();
+  const [emailInput, setEmailInput] = useState('');
+  const [passInput, setPassInput] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoggingIn(true);
+    setAuthError(null);
+    try {
+      let email = emailInput.trim();
+      if (!email.includes('@')) {
+        email = `${email.toLowerCase()}@hcd.com`;
+      }
+      await signIn(email, passInput);
+    } catch (error: any) {
+      console.error(error);
+      setAuthError('Credenciales inválidas. Verifique su usuario y contraseña.');
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
 
   useEffect(() => {
     const handleOnline = () => setConnectionStatus(dataLoading ? 'connecting' : 'connected');
@@ -72,7 +93,7 @@ export default function App() {
             const authSnap = await getDoc(authRef);
             
             // Hardcoded fallback for the main admin to ensure they can seed the database
-            const isMainAdmin = u.email === 'lautaroj.aguilera@gmail.com';
+            const isMainAdmin = u.email === 'lautaroj@hcd.com';
             
             if (authSnap.exists() || isMainAdmin) {
               const isAdmin = isMainAdmin;
@@ -200,14 +221,42 @@ export default function App() {
                       </div>
                     )}
                     <div className="space-y-6">
-                      <h2 className="text-3xl font-display font-medium text-white">Acceso Restringido</h2>
-                      <p className="text-zinc-500">Solo concejales autorizados pueden acceder al panel de votación.</p>
-                      <button 
-                        onClick={signIn}
-                        className="w-full py-4 bg-teal-600 hover:bg-teal-500 text-white rounded-2xl font-bold flex items-center justify-center gap-3 transition-all shadow-lg shadow-teal-500/20"
-                      >
-                        <LogIn className="w-5 h-5" /> Iniciar con Google
-                      </button>
+                      <h2 className="text-3xl font-display font-medium text-white text-center">Acceso Legislativo</h2>
+                      <p className="text-zinc-500 text-center">Solo concejales autorizados pueden acceder al panel de votación.</p>
+                      
+                      <form onSubmit={handleLogin} className="space-y-4">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Usuario</label>
+                          <input 
+                            type="text"
+                            required
+                            placeholder="Ej: lautaroj"
+                            value={emailInput}
+                            onChange={(e) => setEmailInput(e.target.value)}
+                            className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-white focus:outline-none focus:ring-2 focus:ring-teal-500/50 transition-all placeholder:text-zinc-700"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Contraseña</label>
+                          <input 
+                            type="password"
+                            required
+                            placeholder="••••••••"
+                            value={passInput}
+                            onChange={(e) => setPassInput(e.target.value)}
+                            className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-white focus:outline-none focus:ring-2 focus:ring-teal-500/50 transition-all placeholder:text-zinc-700"
+                          />
+                        </div>
+                        
+                        <button 
+                          type="submit"
+                          disabled={isLoggingIn}
+                          className="w-full py-4 bg-teal-600 hover:bg-teal-500 text-white rounded-2xl font-bold flex items-center justify-center gap-3 transition-all shadow-lg shadow-teal-500/20 disabled:opacity-50"
+                        >
+                          {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : <LogIn className="w-5 h-5" />} 
+                          Iniciar Sesión
+                        </button>
+                      </form>
                     </div>
                   </div>
                 ) : (

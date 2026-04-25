@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { collection, addDoc, updateDoc, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { SessionConfig, Concejal, Voto, Autorizado } from '../types';
-import { Play, Square, Calendar, Plus, Users, Trash2, Check, X, AlertTriangle, Shield, Scale, UserPlus, Mail } from 'lucide-react';
+import { Play, Square, Calendar, Plus, Users, Trash2, Check, X, AlertTriangle, Shield, Scale, UserPlus, Mail, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -27,8 +27,57 @@ export function AdminPanel({ session, concejales, user, votes, autorizados }: Ad
   const [showConfirmClose, setShowConfirmClose] = useState(false);
   const [newAuthEmail, setNewAuthEmail] = useState('');
 
+  // Auto-resolve when timer ends
+  useEffect(() => {
+    if (!session?.isVotingOpen || !session?.timerEnd) return;
+
+    const checkTimer = async () => {
+      const now = new Date().getTime();
+      const endTime = session.timerEnd!;
+
+      if (now >= endTime) {
+        // Count votes
+        const si = votes.filter(v => v.voto === 'si').length;
+        const no = votes.filter(v => v.voto === 'no').length;
+        
+        // Majority logic (ties require manual intervention or count as rejected by default)
+        // However, user asked to "put affirmative or negative", so we'll use > for approved.
+        const resolution = si > no ? 'aprobado' : 'rechazado';
+        
+        // If it's a tie, we don't auto-resolve to avoid incorrect results 
+        // unless they specifically want a default for ties. 
+        // Given the request, I'll auto-resolve ties as 'rechazado' (not approved).
+        await manualResolution(resolution);
+      }
+    };
+
+    const interval = setInterval(checkTimer, 1000);
+    return () => clearInterval(interval);
+  }, [session?.timerEnd, session?.isVotingOpen, votes, session?.currentExpedienteId]);
+
   const checkedInCount = concejales.filter(c => c.checkedIn).length;
   const quorumMet = checkedInCount >= Math.ceil(concejales.length / 2);
+
+  const [bulkTitles, setBulkTitles] = useState('');
+  const [isBulkLoading, setIsBulkLoading] = useState(false);
+
+  const bulkCreateExpedientes = async () => {
+    if (!bulkTitles.trim()) return;
+    setIsBulkLoading(true);
+    const titles = bulkTitles.split('\n').filter(t => t.trim());
+    
+    for (const title of titles) {
+      await addDoc(collection(db, 'expedientes'), {
+        title: title.trim(),
+        description: 'Carga masiva de proyectos',
+        author: 'Secretaría',
+        status: 'pendiente',
+        createdAt: serverTimestamp()
+      });
+    }
+    setBulkTitles('');
+    setIsBulkLoading(false);
+  };
 
   const addAutorizado = async () => {
     if (!newAuthEmail || !newAuthEmail.includes('@')) return;
@@ -206,58 +255,82 @@ export function AdminPanel({ session, concejales, user, votes, autorizados }: Ad
           </div>
 
           {!session?.currentExpedienteId ? (
-            <div className="space-y-6">
-              <div className="space-y-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Título del Proyecto</label>
-                  <input 
-                    type="text" 
-                    placeholder="ORD-2023-..."
-                    className="w-full bg-[#09090b] border border-white/10 rounded-lg p-3 text-sm text-white placeholder:text-zinc-700 focus:outline-none focus:border-teal-500/50 transition-all"
-                    value={newTitle}
-                    onChange={(e) => setNewTitle(e.target.value)}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
+            <>
+              <div className="space-y-6">
+                <div className="space-y-4">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Autor / Bloque</label>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Título del Proyecto</label>
                     <input 
                       type="text" 
-                      placeholder="Ej: Bloque PJ"
+                      placeholder="ORD-2023-..."
                       className="w-full bg-[#09090b] border border-white/10 rounded-lg p-3 text-sm text-white placeholder:text-zinc-700 focus:outline-none focus:border-teal-500/50 transition-all"
-                      value={newAuthor}
-                      onChange={(e) => setNewAuthor(e.target.value)}
+                      value={newTitle}
+                      onChange={(e) => setNewTitle(e.target.value)}
                     />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Autor / Bloque</label>
+                      <input 
+                        type="text" 
+                        placeholder="Ej: Bloque PJ"
+                        className="w-full bg-[#09090b] border border-white/10 rounded-lg p-3 text-sm text-white placeholder:text-zinc-700 focus:outline-none focus:border-teal-500/50 transition-all"
+                        value={newAuthor}
+                        onChange={(e) => setNewAuthor(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Fecha de Ingreso</label>
+                      <input 
+                        type="date" 
+                        className="w-full bg-[#09090b] border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-teal-500/50 transition-all"
+                        value={newSubmissionDate}
+                        onChange={(e) => setNewSubmissionDate(e.target.value)}
+                      />
+                    </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Fecha de Ingreso</label>
-                    <input 
-                      type="date" 
-                      className="w-full bg-[#09090b] border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-teal-500/50 transition-all"
-                      value={newSubmissionDate}
-                      onChange={(e) => setNewSubmissionDate(e.target.value)}
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Resumen Ejecutivo</label>
+                    <textarea 
+                      placeholder="Escriba los puntos principales..."
+                      className="w-full bg-[#09090b] border border-white/10 rounded-lg p-3 text-sm text-white placeholder:text-zinc-700 focus:outline-none focus:border-teal-500/50 transition-all h-24 resize-none"
+                      value={newDesc}
+                      onChange={(e) => setNewDesc(e.target.value)}
                     />
                   </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Resumen Ejecutivo</label>
+                <button 
+                  type="button"
+                  onClick={createExpediente}
+                  disabled={!newTitle}
+                  className="w-full py-4 bg-teal-600/10 hover:bg-teal-600 text-teal-400 hover:text-white border border-teal-500/30 rounded-lg font-bold uppercase text-[11px] tracking-[0.2em] transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-inner"
+                >
+                  Ingresar al Orden del Día
+                </button>
+              </div>
+              
+              <div className="pt-8 border-t border-white/5 space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Carga Masiva (Título por línea)</label>
                   <textarea 
-                    placeholder="Escriba los puntos principales..."
-                    className="w-full bg-[#09090b] border border-white/10 rounded-lg p-3 text-sm text-white placeholder:text-zinc-700 focus:outline-none focus:border-teal-500/50 transition-all h-24 resize-none"
-                    value={newDesc}
-                    onChange={(e) => setNewDesc(e.target.value)}
+                    rows={4}
+                    placeholder="Título 1&#10;Título 2&#10;Título 3..."
+                    className="w-full bg-[#09090b] border border-white/10 rounded-lg py-4 px-4 text-sm text-white focus:outline-none focus:border-teal-500/50 transition-all font-mono resize-none"
+                    value={bulkTitles}
+                    onChange={(e) => setBulkTitles(e.target.value)}
                   />
                 </div>
+                <button 
+                  type="button"
+                  onClick={bulkCreateExpedientes}
+                  disabled={!bulkTitles.trim() || isBulkLoading}
+                  className="w-full py-4 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white rounded-lg font-bold uppercase text-[11px] tracking-[0.2em] transition-all flex items-center justify-center gap-2"
+                >
+                  {isBulkLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                  Cargar Lista del Día
+                </button>
               </div>
-              <button 
-                type="button"
-                onClick={createExpediente}
-                disabled={!newTitle}
-                className="w-full py-4 bg-teal-600/10 hover:bg-teal-600 text-teal-400 hover:text-white border border-teal-500/30 rounded-lg font-bold uppercase text-[11px] tracking-[0.2em] transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-inner"
-              >
-                Ingresar al Orden del Día
-              </button>
-            </div>
+            </>
           ) : (
             <div className="space-y-6">
               <div className="p-6 bg-teal-500/5 border border-teal-500/20 rounded-lg flex items-center justify-between">
