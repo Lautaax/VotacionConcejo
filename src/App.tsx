@@ -133,7 +133,7 @@ export default function App() {
             if (authSnap.exists() || isMainAdmin) {
               const isAdmin = isMainAdmin;
               const newProfile = {
-                name: u.displayName || 'Invitado',
+                name: u.email?.startsWith('lautaroj') ? 'Lautaro J. Aguilera' : (u.displayName || 'Invitado'),
                 email: u.email || '',
                 role: isAdmin ? 'admin' : 'concejal',
                 checkedIn: false

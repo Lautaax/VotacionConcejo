@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { updateDoc, doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { SessionConfig, Expediente, Voto, Concejal } from '../types';
-import { Check, X, Minus, UserCheck, AlertCircle, Clock, CheckCircle } from 'lucide-react';
+import { Check, X, Minus, UserCheck, AlertCircle, Clock, CheckCircle, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface ConcejalPanelProps {
@@ -16,19 +16,33 @@ interface ConcejalPanelProps {
 
 export function ConcejalPanel({ user, profile, session, currentExpediente, votes, connectionStatus = 'connected' }: ConcejalPanelProps) {
   const [isLiking, setIsLiking] = useState(false);
+  const [isCheckingIn, setIsCheckingIn] = useState(false);
   const myVote = votes.find(v => v.concejalId === user.uid);
   const timeLeft = session?.timerEnd ? Math.max(0, Math.floor((session.timerEnd - Date.now()) / 1000)) : 0;
   const isOffline = connectionStatus === 'disconnected';
 
   const checkIn = async () => {
-    if (!user || isOffline) return;
+    if (!user || isOffline || isCheckingIn) return;
+    setIsCheckingIn(true);
     try {
-      await setDoc(doc(db, 'concejales', user.uid), {
+      const docRef = doc(db, 'concejales', user.uid);
+      await updateDoc(docRef, {
         checkedIn: true,
-        name: user.displayName || profile?.name || 'Concejal'
-      }, { merge: true });
+        lastCheckIn: serverTimestamp()
+      });
     } catch (error) {
       console.error("Attendance confirmation failed:", error);
+      // Fallback to setDoc with merge if updateDoc fails (e.g. if document just got deleted)
+      try {
+        await setDoc(doc(db, 'concejales', user.uid), {
+          checkedIn: true,
+          name: profile?.name || user.displayName || 'Concejal'
+        }, { merge: true });
+      } catch (innerErr) {
+        console.error("Critical: setDoc fallback also failed", innerErr);
+      }
+    } finally {
+      setIsCheckingIn(false);
     }
   };
 
@@ -60,10 +74,15 @@ export function ConcejalPanel({ user, profile, session, currentExpediente, votes
           </div>
           <button 
             onClick={checkIn}
-            disabled={isOffline}
-            className="w-full py-4 bg-teal-600 hover:bg-teal-500 disabled:bg-zinc-800 disabled:text-zinc-500 text-white rounded-xl font-bold tracking-[0.2em] uppercase text-xs transition-all shadow-lg shadow-teal-500/10"
+            disabled={isOffline || isCheckingIn}
+            className="w-full py-4 bg-teal-600 hover:bg-teal-500 disabled:bg-zinc-800 disabled:text-zinc-500 text-white rounded-xl font-bold tracking-[0.2em] uppercase text-xs transition-all shadow-lg shadow-teal-500/10 flex items-center justify-center gap-2"
           >
-            {isOffline ? 'SIN CONEXIÓN' : 'Confirmar Asistencia'}
+            {isCheckingIn ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Procesando...
+              </>
+            ) : isOffline ? 'SIN CONEXIÓN' : 'Confirmar Asistencia'}
           </button>
         </div>
       </div>
