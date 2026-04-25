@@ -30,6 +30,8 @@ export default function App() {
   const [passInput, setPassInput] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
+  const isEmailAdmin = (email: string | null) => email === 'lautaroj@hcd.com';
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoggingIn(true);
@@ -42,6 +44,7 @@ export default function App() {
 
       // Special case: check if we need to create the default users for the new project
       if ((email === 'lautaroj@hcd.com' && passInput === 'lauta1') || 
+          (email === 'sebastan@hcd.com' && passInput === 'seba1') ||
           (email === 'sebanieto@hcd.com' && passInput === 'seba1')) {
         try {
           // Attempt sign in
@@ -131,9 +134,13 @@ export default function App() {
             const isMainAdmin = u.email === 'lautaroj@hcd.com';
             
             if (authSnap.exists() || isMainAdmin) {
-              const isAdmin = isMainAdmin;
+              const isAdmin = isEmailAdmin(u.email);
+              let name = u.displayName || 'Invitado';
+              if (u.email === 'lautaroj@hcd.com') name = 'Lautaro (Presidente)';
+              if (u.email === 'sebastan@hcd.com' || u.email === 'sebanieto@hcd.com') name = 'Sebastian';
+
               const newProfile = {
-                name: u.email?.startsWith('lautaroj') ? 'Lautaro J. Aguilera' : (u.displayName || 'Invitado'),
+                name,
                 email: u.email || '',
                 role: isAdmin ? 'admin' : 'concejal',
                 checkedIn: false
