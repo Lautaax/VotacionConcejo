@@ -1,10 +1,9 @@
 {
-  "projectId": "bahia-oficios",
-  "appId": "1:706869743317:web:7383f7c8f29d47b38c9c5c",
-  "apiKey": "AIzaSyBw6Mdc7qCuEkelg_1JavfVyzVMIUWbaRY",
-  "authDomain": "bahia-oficios.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-0f640773-adfd-4bf9-842f-96274755fb09",
-  "storageBucket": "bahia-oficios.firebasestorage.app",
-  "messagingSenderId": "706869743317",
-  "measurementId": ""
+  "projectId": "alertsmapbb",
+  "appId": "1:1004775926138:web:041a6830a8457ee0378ec3",
+  "apiKey": "AIzaSyC0KiTEw-qilNdVPfHYg7sTjrvZZlj-4Y8",
+  "authDomain": "alertsmapbb.firebaseapp.com",
+  "storageBucket": "alertsmapbb.firebasestorage.app",
+  "messagingSenderId": "1004775926138",
+  "measurementId": "G-C3NDKSWHMG"
 }
