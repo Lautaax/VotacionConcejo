@@ -95,6 +95,16 @@ export function AdminPanel({ session, concejales, user, votes, autorizados }: Ad
 
   const createExpediente = async () => {
     if (!newTitle) return;
+    
+    // Ensure session doc exists before anything else (for new projects)
+    if (!session) {
+      await setDoc(doc(db, 'configuracion', 'sesion'), {
+        isSessionActive: false,
+        isVotingOpen: false,
+        currentExpedienteId: null
+      });
+    }
+
     const docRef = await addDoc(collection(db, 'expedientes'), {
       title: newTitle,
       description: newDesc,

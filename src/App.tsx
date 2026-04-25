@@ -39,7 +39,42 @@ export default function App() {
       if (!email.includes('@')) {
         email = `${email.toLowerCase()}@hcd.com`;
       }
-      await signIn(email, passInput);
+
+      // Special case: check if we need to create the default users for the new project
+      if ((email === 'lautaroj@hcd.com' && passInput === 'lauta1') || 
+          (email === 'sebanieto@hcd.com' && passInput === 'seba1')) {
+        try {
+          // Attempt sign in
+          await signIn(email, passInput);
+        } catch (signInErr: any) {
+          // If sign in fails, try to create them (one-time setup for the new project)
+          if (signInErr.code === 'auth/user-not-found' || signInErr.code === 'auth/invalid-credential' || signInErr.code === 'auth/wrong-password') {
+            const { createUserWithEmailAndPassword, signInWithEmailAndPassword: signInAuth } = await import('firebase/auth');
+            try {
+              await createUserWithEmailAndPassword(auth, email, passInput);
+            } catch (createErr: any) {
+              if (createErr.code === 'auth/email-already-in-use') {
+                 // If already exists but we have the right credentials according to the user request, 
+                 // we just sign in (maybe measurementId or some other issue caused the previous catch)
+                 await signInAuth(auth, email, passInput);
+              } else {
+                throw createErr;
+              }
+            }
+          } else {
+            throw signInErr;
+          }
+        }
+        
+        // Ensure they are in autorizados collection
+        const authRef = doc(db, 'autorizados', email);
+        const authSnap = await getDoc(authRef);
+        if (!authSnap.exists()) {
+          await setDoc(authRef, { email, addedAt: serverTimestamp() });
+        }
+      } else {
+        await signIn(email, passInput);
+      }
     } catch (error: any) {
       console.error(error);
       setAuthError('Credenciales inválidas. Verifique su usuario y contraseña.');

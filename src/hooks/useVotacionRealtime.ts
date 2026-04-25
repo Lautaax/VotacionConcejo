@@ -18,6 +18,9 @@ export function useVotacionRealtime() {
         setSession(snap.data() as SessionConfig);
       }
       setIsLoading(false);
+    }, (error) => {
+      console.error("Session sync error:", error);
+      setIsLoading(false);
     });
     return unsub;
   }, []);
@@ -32,6 +35,8 @@ export function useVotacionRealtime() {
       if (snap.exists()) {
         setCurrentExpediente({ id: snap.id, ...snap.data() } as Expediente);
       }
+    }, (error) => {
+      console.error("Expediente sync error:", error);
     });
     return unsub;
   }, [session?.currentExpedienteId]);
@@ -49,6 +54,8 @@ export function useVotacionRealtime() {
     const unsub = onSnapshot(q, (snap) => {
       const votesData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Voto));
       setVotes(votesData);
+    }, (error) => {
+      console.error("Votes sync error:", error);
     });
     return unsub;
   }, [session?.currentExpedienteId]);
@@ -58,6 +65,8 @@ export function useVotacionRealtime() {
     const unsub = onSnapshot(collection(db, 'concejales'), (snap) => {
       const concejalesData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Concejal));
       setConcejales(concejalesData);
+    }, (error) => {
+      console.error("Concejales sync error:", error);
     });
     return unsub;
   }, []);
@@ -67,6 +76,8 @@ export function useVotacionRealtime() {
     const unsub = onSnapshot(collection(db, 'autorizados'), (snap) => {
       const data = snap.docs.map(doc => doc.data() as Autorizado);
       setAutorizados(data);
+    }, (error) => {
+      console.error("Autorizados sync error:", error);
     });
     return unsub;
   }, []);
