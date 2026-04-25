@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, onSnapshot, getDoc, setDoc, getDocFromServer } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc, setDoc, getDocFromServer, serverTimestamp } from 'firebase/firestore';
 import { auth, db, signIn, signOut } from './lib/firebase';
 import { Header } from './components/Header';
 import { VotacionPizarra } from './components/VotacionPizarra';
@@ -15,13 +15,8 @@ import { cn } from './lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+// View type definition
 type View = 'live' | 'history' | 'private';
-
-// List of authorized emails (could also be moved to Firestore later)
-const AUTHORIZED_EMAILS = [
-  'lautaroj.aguilera@gmail.com',
-  // Add other authorized emails here
-];
 
 export default function App() {
   const [view, setView] = useState<View>('live');
@@ -30,7 +25,7 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'connecting' | 'disconnected'>('connecting');
-  const { session, currentExpediente, votes, concejales, isLoading: dataLoading } = useVotacionRealtime();
+  const { session, currentExpediente, votes, concejales, autorizados, isLoading: dataLoading } = useVotacionRealtime();
 
   useEffect(() => {
     const handleOnline = () => setConnectionStatus(dataLoading ? 'connecting' : 'connected');
@@ -72,8 +67,15 @@ export default function App() {
           if (snap.exists()) {
             setProfile({ id: snap.id, ...snap.data() } as Concejal);
           } else {
-            if (AUTHORIZED_EMAILS.includes(u.email || '')) {
-              const isAdmin = u.email === 'lautaroj.aguilera@gmail.com';
+            // Check authorization in Firestore
+            const authRef = doc(db, 'autorizados', u.email || '');
+            const authSnap = await getDoc(authRef);
+            
+            // Hardcoded fallback for the main admin to ensure they can seed the database
+            const isMainAdmin = u.email === 'lautaroj.aguilera@gmail.com';
+            
+            if (authSnap.exists() || isMainAdmin) {
+              const isAdmin = isMainAdmin;
               const newProfile = {
                 name: u.displayName || 'Invitado',
                 email: u.email || '',
@@ -81,6 +83,11 @@ export default function App() {
                 checkedIn: false
               };
               await setDoc(docRef, newProfile);
+              
+              // Seed the main admin into autorizados if they were the fallback
+              if (isMainAdmin && !authSnap.exists()) {
+                await setDoc(authRef, { email: u.email, addedAt: serverTimestamp() });
+              }
             } else {
               setAuthError('Usted no se encuentra en la nómina de personal autorizado.');
               await signOut();
@@ -225,7 +232,7 @@ export default function App() {
 
                     <div className="space-y-8">
                       {profile?.role === 'admin' && (
-                        <AdminPanel session={session} concejales={concejales} user={user} votes={votes} />
+                        <AdminPanel session={session} concejales={concejales} user={user} votes={votes} autorizados={autorizados} />
                       )}
                       
                       <ConcejalPanel 

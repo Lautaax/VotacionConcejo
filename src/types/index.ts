@@ -35,3 +35,8 @@ export interface SessionConfig {
   isSessionActive: boolean;
   isVotingOpen: boolean;
 }
+
+export interface Autorizado {
+  email: string;
+  addedAt: Timestamp;
+}

@@ -48,12 +48,23 @@
         "isSessionActive": { "type": "boolean" },
         "isVotingOpen": { "type": "boolean" }
       }
+    },
+    "autorizado": {
+      "title": "Email Autorizado",
+      "description": "Email permitido para registrarse como concejal.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "addedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email"]
     }
   },
   "firestore": {
     "/expedientes/{id}": { "schema": "expediente", "description": "Documentos legislativos" },
     "/votos/{id}": { "schema": "voto", "description": "Historial de votos individuales" },
     "/concejales/{id}": { "schema": "concejal", "description": "Perfiles y roles" },
-    "/configuracion/sesion": { "schema": "configuracion", "description": "Estado de la sesión actual" }
+    "/configuracion/sesion": { "schema": "configuracion", "description": "Estado de la sesión actual" },
+    "/autorizados/{email}": { "schema": "autorizado", "description": "Emails permitidos para el sistema" }
   }
 }

@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { doc, onSnapshot, collection, query, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { SessionConfig, Expediente, Voto, Concejal } from '../types';
+import { SessionConfig, Expediente, Voto, Concejal, Autorizado } from '../types';
 
 export function useVotacionRealtime() {
   const [session, setSession] = useState<SessionConfig | null>(null);
   const [currentExpediente, setCurrentExpediente] = useState<Expediente | null>(null);
   const [votes, setVotes] = useState<Voto[]>([]);
   const [concejales, setConcejales] = useState<Concejal[]>([]);
+  const [autorizados, setAutorizados] = useState<Autorizado[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Sync Session Config
@@ -61,5 +62,14 @@ export function useVotacionRealtime() {
     return unsub;
   }, []);
 
-  return { session, currentExpediente, votes, concejales, isLoading };
+  // Sync Autorizados List
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'autorizados'), (snap) => {
+      const data = snap.docs.map(doc => doc.data() as Autorizado);
+      setAutorizados(data);
+    });
+    return unsub;
+  }, []);
+
+  return { session, currentExpediente, votes, concejales, autorizados, isLoading };
 }

@@ -77,5 +77,10 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAdmin();
     }
+
+    match /autorizados/{email} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
   }
 }

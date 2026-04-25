@@ -1,31 +1,48 @@
 import { useState } from 'react';
 import { collection, addDoc, updateDoc, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { SessionConfig, Concejal, Voto } from '../types';
-import { Play, Square, Calendar, Plus, Users, Trash2, Check, X, AlertTriangle, Shield, Scale } from 'lucide-react';
+import { SessionConfig, Concejal, Voto, Autorizado } from '../types';
+import { Play, Square, Calendar, Plus, Users, Trash2, Check, X, AlertTriangle, Shield, Scale, UserPlus, Mail } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 import { User } from 'firebase/auth';
+import { deleteDoc } from 'firebase/firestore';
 
 interface AdminPanelProps {
   session: SessionConfig | null;
   concejales: Concejal[];
   user: User | null;
   votes: Voto[];
+  autorizados: Autorizado[];
 }
 
-export function AdminPanel({ session, concejales, user, votes }: AdminPanelProps) {
+export function AdminPanel({ session, concejales, user, votes, autorizados }: AdminPanelProps) {
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [newAuthor, setNewAuthor] = useState('');
   const [newSubmissionDate, setNewSubmissionDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [nextDate, setNextDate] = useState(format(new Date(), "yyyy-MM-dd'T'HH:mm"));
   const [showConfirmClose, setShowConfirmClose] = useState(false);
+  const [newAuthEmail, setNewAuthEmail] = useState('');
 
   const checkedInCount = concejales.filter(c => c.checkedIn).length;
   const quorumMet = checkedInCount >= Math.ceil(concejales.length / 2);
+
+  const addAutorizado = async () => {
+    if (!newAuthEmail || !newAuthEmail.includes('@')) return;
+    await setDoc(doc(db, 'autorizados', newAuthEmail.toLowerCase().trim()), {
+      email: newAuthEmail.toLowerCase().trim(),
+      addedAt: serverTimestamp()
+    });
+    setNewAuthEmail('');
+  };
+
+  const removeAutorizado = async (email: string) => {
+    if (email === user?.email) return; // Don't remove yourself
+    await deleteDoc(doc(db, 'autorizados', email));
+  };
 
   const createExpediente = async () => {
     if (!newTitle) return;
@@ -318,40 +335,122 @@ export function AdminPanel({ session, concejales, user, votes }: AdminPanelProps
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {concejales.map((c) => (
-            <div key={c.id} className="bg-[#09090b] border border-white/10 rounded-lg p-4 flex items-center justify-between group hover:border-teal-500/30 transition-all">
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-white">{c.name}</p>
-                <div className="flex items-center gap-2">
-                  <span className={cn(
-                    "text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded",
-                    c.role === 'admin' ? "bg-teal-500/10 text-teal-500" : "bg-white/5 text-slate-500"
-                  )}>
-                    {c.role}
-                  </span>
-                  {c.isPresidenteBloque && (
-                    <span className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500">
-                      Pres. Bloque
-                    </span>
-                  )}
+            <div key={c.id} className="bg-[#09090b] border border-white/10 rounded-lg p-4 flex flex-col gap-4 group hover:border-teal-500/30 transition-all">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1 flex-1">
+                  <input 
+                    type="text" 
+                    defaultValue={c.name}
+                    onBlur={async (e) => {
+                      if (e.target.value === c.name) return;
+                      await updateDoc(doc(db, 'concejales', c.id), {
+                        name: e.target.value
+                      });
+                    }}
+                    className="bg-transparent border-none text-sm font-medium text-white p-0 focus:ring-0 w-full"
+                  />
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={async () => {
+                        await updateDoc(doc(db, 'concejales', c.id), {
+                          role: c.role === 'admin' ? 'concejal' : 'admin'
+                        });
+                      }}
+                      className={cn(
+                        "text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded transition-colors",
+                        c.role === 'admin' ? "bg-teal-500/20 text-teal-500 hover:bg-teal-500/30" : "bg-white/5 text-slate-500 hover:bg-white/10"
+                      )}
+                    >
+                      {c.role}
+                    </button>
+                    {c.isPresidenteBloque && (
+                      <span className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500">
+                        Pres. Bloque
+                      </span>
+                    )}
+                  </div>
                 </div>
+                <button 
+                  type="button"
+                  onClick={async () => {
+                    await updateDoc(doc(db, 'concejales', c.id), {
+                      isPresidenteBloque: !c.isPresidenteBloque
+                    });
+                  }}
+                  className={cn(
+                    "p-2 rounded-lg border transition-all",
+                    c.isPresidenteBloque ? "bg-amber-500/10 border-amber-500/30 text-amber-500" : "bg-white/5 border-white/10 text-slate-600 hover:text-white"
+                  )}
+                  title={c.isPresidenteBloque ? "Quitar Presidente de Bloque" : "Asignar Presidente de Bloque"}
+                >
+                  <Shield className="w-4 h-4" />
+                </button>
               </div>
-              <button 
-                type="button"
-                onClick={async () => {
-                  await updateDoc(doc(db, 'concejales', c.id), {
-                    isPresidenteBloque: !c.isPresidenteBloque
-                  });
-                }}
-                className={cn(
-                  "p-2 rounded-lg border transition-all",
-                  c.isPresidenteBloque ? "bg-amber-500/10 border-amber-500/30 text-amber-500" : "bg-white/5 border-white/10 text-slate-600 hover:text-white"
-                )}
-                title={c.isPresidenteBloque ? "Quitar Presidente de Bloque" : "Asignar Presidente de Bloque"}
-              >
-                <Shield className="w-4 h-4" />
-              </button>
+              <p className="text-[9px] font-mono text-zinc-600 truncate">{c.email}</p>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Whitelist Management */}
+      <div className="bg-[#0c0c0e] border border-white/10 rounded-xl p-8 space-y-8">
+        <div className="flex items-center gap-3">
+          <UserPlus className="w-5 h-5 text-teal-500" />
+          <h4 className="text-sm font-bold uppercase tracking-widest text-white">Nómina de Personal Autorizado</h4>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-8">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Añadir Nuevo Email</label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
+                  <input 
+                    type="email" 
+                    placeholder="email@ejemplo.com"
+                    className="w-full bg-[#09090b] border border-white/10 rounded-lg py-3 pl-10 pr-3 text-sm text-white focus:outline-none focus:border-teal-500/50 transition-all"
+                    value={newAuthEmail}
+                    onChange={(e) => setNewAuthEmail(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && addAutorizado()}
+                  />
+                </div>
+                <button 
+                  onClick={addAutorizado}
+                  className="px-6 bg-teal-600 hover:bg-teal-500 text-white rounded-lg font-bold text-[10px] uppercase tracking-widest transition-all"
+                >
+                  Autorizar
+                </button>
+              </div>
+            </div>
+            <p className="text-[9px] text-zinc-600 italic">
+              Solo los usuarios con estos correos electrónicos podrán registrarse y votar en el sistema.
+            </p>
+          </div>
+
+          <div className="bg-[#09090b] border border-white/10 rounded-lg divide-y divide-white/5 max-h-[300px] overflow-y-auto">
+            {autorizados.length === 0 ? (
+              <div className="p-8 text-center text-zinc-600 text-[10px] uppercase tracking-widest">No hay emails autorizados</div>
+            ) : (
+              autorizados.map((auth) => (
+                <div key={auth.email} className="p-4 flex items-center justify-between group hover:bg-white/5 transition-all">
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 rounded-full bg-teal-500" />
+                    <span className="text-sm text-zinc-300 font-mono">{auth.email}</span>
+                  </div>
+                  {auth.email !== user?.email && (
+                    <button 
+                      onClick={() => removeAutorizado(auth.email)}
+                      className="p-2 text-zinc-700 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                      title="Eliminar autorización"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
     </div>
